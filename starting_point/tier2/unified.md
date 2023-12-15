@@ -53,9 +53,3 @@
   - Accessed the root account using SSH: `ssh root@10.129.11.162`.
   - Obtained the root flag at `/root/root.txt`.
 
-## Flags Found
-
-- **User Flag (Michael's Home Directory):** `6ced1a6a89e666c0620cdb10262ba127`
-- **Root Flag (Root's Home Directory):** `e50bc93c75b634e4b272d2f771c33681`
-
-

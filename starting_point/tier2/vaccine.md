@@ -51,8 +51,3 @@
   - Edited the file using `vi` to elevate privileges.
   - Achieved root access and obtained the root flag at `/root/root.txt`.
 
-## Flags Found
-
-- **User Flag (PostgreSQL Directory):** `ec9b13ca4d6229cd5cc1e09980965bf7`
-- **Root Flag (Root's Home Directory):** `dd6e058e814260bc70e9bbdef2715849`
-

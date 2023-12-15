@@ -64,9 +64,5 @@
   ```
   - Accessed administrator's desktop and retrieved the flag at `root.txt`.
 
-## Flags Found
-
-- **User Flag:** `3e7b102e78218e935bf3f4951fec21a3`
-- **Root Flag:** `b91ccec3305e98240082d4474b848528`
 
 

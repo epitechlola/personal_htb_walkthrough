@@ -45,8 +45,3 @@
 - Modified the `PATH` variable to execute the custom `cat` file.
 - Executed `bugtracker`, obtaining root access.
 
-## Flags Found
-
-- **User Flag (Robert's Home Directory):** `f2c74ee8db7983851ab2a96a44eb7981`
-- **Root Flag (Root's Home Directory):** `af13b0bee69f8a877c3faf667f7beacf`
-
